@@ -14,12 +14,13 @@ import unittest
 import subprocess
 import logging
 import os
+import re
 
-# Uncomment the 2nd line below to temporary define
-#   as True to collect real world queries (see README.md)
-ADD_QUERY_TO_KNOWN = False
-# ADD_QUERY_TO_KNOWN = True  # Uncomment to add kitspace query results to test db
+# Collect real world queries (see README.md)
+# Change to 1 when the query result must be saved, then revert to 0
+ADD_QUERY_TO_KNOWN = 0
 TESTDIR = os.path.dirname(os.path.realpath(__file__))
+last_err = None
 
 
 def run_test(inputs, output, extra=None, price=True):
@@ -54,9 +55,12 @@ def run_test(inputs, output, extra=None, price=True):
         cmd.extend(['-o', out_xlsx])
         cmd.extend(['-wi'] + [TESTDIR + '/' + n for n in inputs])
         logging.debug('Running '+str(cmd))
-        log_err = open(TESTDIR + '/log_test/' + output + '_error.log', 'wt')
-        log_out = open(TESTDIR + '/log_test/' + output + '_out.log', 'wt')
+        log_err = open(TESTDIR + '/log_test/' + output + '_error.log', 'w+t')
+        log_out = open(TESTDIR + '/log_test/' + output + '_out.log', 'w+t')
         subprocess.check_call(cmd, stderr=log_err, stdout=log_out)
+        global last_err
+        log_err.seek(0)
+        last_err = log_err.read()
         log_err.close()
         log_out.close()
         res_csv = TESTDIR + '/result_test/' + output + '.csv'
@@ -105,6 +109,17 @@ def run_test_check(name, inputs=None, output=None, extra=None, price=True):
         if e.output:
             logging.error('Output from command: ' + e.output.decode())
         raise e
+
+
+def check_errors(errors):
+    res = []
+    global last_err
+    for error in errors:
+        m = re.search(error, last_err, re.MULTILINE)
+        assert m is not None, error
+        logging.debug('error match: `{}` (`{}`) OK'.format(error, m.group(0)))
+        res.append(m)
+    return res
 
 
 def test_300_010():
@@ -207,6 +222,11 @@ def test_StickIt_RotaryEncoder():
 
 def test_subparts():
     run_test_check('subparts')
+
+
+def test_subparts_err1():
+    # Here we ask to repeat the manufacturer, but in the first position, nothing to repeat
+    run_test_check('subparts_err1')
 
 
 def test_1():
@@ -315,14 +335,12 @@ def test_parts_and_comments():
 
 
 def test_group_1():
-    # Similar to test_no_empty_overwrite, test field grouping (on comments)
+    # Similar to test_no_empty_overwrite, tests all possible manf# aliases
     run_test_check('group_1_group_fields', 'group_1', output='group_1_group_fields',
-                   extra=['--group_fields', 'h', 'comment',
-                          '--no_collapse', '-f', 'comment', 'S1MN', 'S1PN', 'S2MN', 'S2PN'],
+                   extra=['--group_fields', 'h', 'comment', '--no_collapse', '-f', 'comment', 'S1MN', 'S1PN', 'S2MN', 'S2PN'],
                    price=False)
     run_test_check('group_1_ignore_comment', 'group_1', output='group_1_ignore_comment',
-                   extra=['--ignore_fields', 'h', 'comment',
-                          '--no_collapse', '-f', 'comment', 'S1MN', 'S1PN', 'S2MN', 'S2PN'],
+                   extra=['--ignore_fields', 'h', 'comment', '--no_collapse', '-f', 'comment', 'S1MN', 'S1PN', 'S2MN', 'S2PN'],
                    price=False)
 
 
@@ -339,7 +357,7 @@ def test_423():
     run_test_check('Test 423 XML Wrong', 'test_423_wrong', 'test_423_xml_wrong')
 
 
-def test_sub_part_group_propagate_266():
+def disabled_test_sub_part_group_propagate_266():
     # Test Issue #266
     #  SubPart manf# field should also propagate
     run_test_check('SubPartGroupTest_266', price=False)
@@ -349,6 +367,12 @@ def test_no_empty_overwrite():
     # Test some cases where we overwrite a field using an alias (i.e. mnp changes manf#)
     # See discusion on #471
     run_test_check('no_empty_overwrite', price=False)
+
+
+def test_wrong_pricing():
+    # File with errors in the pricing field
+    run_test_check('wrong_pricing', extra=['--include', 'arrow', '--exclude', 'arrow'])
+    check_errors([r'Malformed pricing number(.*)STK1', r'Malformed pricing entry(.*)PCB1'])
 
 
 class TestKicost(unittest.TestCase):

@@ -25,20 +25,20 @@ This code is available for use under the MIT license.
 
 Copyright 2021 Brad Montgomery
 
-Permission is hereby granted, free of charge, to any person obtaining a copy of this software and 
+Permission is hereby granted, free of charge, to any person obtaining a copy of this software and
 associated documentation files (the 'Software'), to deal in the Software without restriction,
-including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, 
-and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, 
+including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense,
+and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so,
 subject to the following conditions:
 
-The above copyright notice and this permission notice shall be included in all copies or substantial 
+The above copyright notice and this permission notice shall be included in all copies or substantial
 portions of the Software.
 
 THE SOFTWARE IS PROVIDED 'AS IS', WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT
-LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. 
-IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, 
-WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE 
-OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.    
+LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE
+OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 """
 import argparse
@@ -72,17 +72,22 @@ class S(BaseHTTPRequestHandler):
         self._set_headers()
 
     def do_POST(self):
-        content_length = int(self.headers['Content-Length']) # <--- Gets the size of data
-        post_data = self.rfile.read(content_length).decode('utf8') # <--- Gets the data itself
+        content_length = int(self.headers['Content-Length'])  # <--- Gets the size of data
+        post_data = self.rfile.read(content_length).decode('utf8')  # <--- Gets the data itself
         self._set_headers()
         if post_data in queries:
             self.wfile.write(queries[post_data].encode("utf8"))
             print("Known query "+comments[post_data])
         else:
-            data = unquote(post_data.replace('+', ' '))
-            print('Unknown query, len={}\n{}\n{}'.format(content_length, post_data, data))
-            content = "<html><body><h1>POST!</h1><pre>{}</pre></body></html>".format(post_data)
-            self.wfile.write(content.encode("utf8"))
+            post_data = post_data.replace('%7E', '~')
+            if post_data in queries:
+                self.wfile.write(queries[post_data].encode("utf8"))
+                print("Known query (7E replaced) "+comments[post_data])
+            else:
+                data = unquote(post_data.replace('+', ' '))
+                print('Unknown query, len={}\n{}\n{}'.format(content_length, post_data, data))
+                content = "<html><body><h1>POST!</h1><pre>{}</pre></body></html>".format(post_data)
+                self.wfile.write(content.encode("utf8"))
         sys.stdout.flush()
 
 
